@@ -35,6 +35,25 @@ def init_db():
         )
     ''')
 
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS remarks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            message TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT,
+            website_name TEXT,
+            website_url TEXT,
+            visit_time DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     default_websites = [
         # General Shopping
         ('Amazon India', 'General Shopping', 'https://amazon.in'),
@@ -2265,6 +2284,9 @@ BASE_TEMPLATE = '''
                             <i class="fas fa-user-plus"></i> Sign Up
                         </a>
                     {% else %}
+                        <a href="{{ url_for('user_history') }}" class="btn-nav btn-secondary">
+                            <i class="fas fa-history"></i> My History
+                        </a>
                         {% if session.get('is_admin') %}
                             <a href="{{ url_for('admin') }}" class="btn-nav btn-admin">
                                 <i class="fas fa-crown"></i> Admin
@@ -2297,6 +2319,9 @@ BASE_TEMPLATE = '''
                     <i class="fas fa-user-plus"></i> Sign Up
                 </a>
             {% else %}
+                <a href="{{ url_for('user_history') }}" class="btn-nav btn-secondary" style="justify-content: center;">
+                    <i class="fas fa-history"></i> My History
+                </a>
                 {% if session.get('is_admin') %}
                     <a href="{{ url_for('admin') }}" class="btn-nav btn-admin" style="justify-content: center;">
                         <i class="fas fa-crown"></i> Admin Panel
@@ -2494,6 +2519,263 @@ BASE_TEMPLATE = '''
         initTheme();
     </script>
 
+    <!-- Floating Remarks/Feedback Button -->
+    <button id="remarksBtn" class="remarks-float-btn" onclick="openRemarksModal()" title="Submit Feedback">
+        <i class="fas fa-comment-dots"></i>
+        <span>Feedback</span>
+    </button>
+
+    <!-- Remarks Modal -->
+    <div id="remarksModal" class="remarks-modal">
+        <div class="remarks-modal-content">
+            <div class="remarks-modal-header">
+                <h3><i class="fas fa-comment-dots"></i> Submit Your Feedback</h3>
+                <button class="remarks-modal-close" onclick="closeRemarksModal()">&times;</button>
+            </div>
+            <form action="/submit_remark" method="POST">
+                <div class="form-group">
+                    <label for="remarkName"><i class="fas fa-user"></i> Your Name (Optional)</label>
+                    <input type="text" id="remarkName" name="name" placeholder="Enter your name">
+                </div>
+                <div class="form-group">
+                    <label for="remarkMessage"><i class="fas fa-comment"></i> Your Message</label>
+                    <textarea id="remarkMessage" name="message" rows="5" required placeholder="Share your thoughts, suggestions, or feedback..."></textarea>
+                </div>
+                <div class="remarks-modal-footer">
+                    <button type="button" class="btn-cancel" onclick="closeRemarksModal()">Cancel</button>
+                    <button type="submit" class="btn-submit-remark"><i class="fas fa-paper-plane"></i> Submit Feedback</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <style>
+        /* Floating Remarks Button */
+        .remarks-float-btn {
+            position: fixed;
+            bottom: 25px;
+            right: 25px;
+            z-index: 9998;
+            background: var(--gradient-primary);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 14px 24px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all var(--transition-base);
+        }
+
+        .remarks-float-btn:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .remarks-float-btn i {
+            font-size: 1.2rem;
+        }
+
+        /* Remarks Modal */
+        .remarks-modal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .remarks-modal.active {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .remarks-modal-content {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-xl);
+            animation: slideUp 0.3s ease;
+        }
+
+        .remarks-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 25px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .remarks-modal-header h3 {
+            color: var(--primary-color);
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .remarks-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.8rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: color var(--transition-fast);
+        }
+
+        .remarks-modal-close:hover {
+            color: var(--error-color);
+        }
+
+        .remarks-modal-content .form-group {
+            padding: 20px 25px;
+        }
+
+        .remarks-modal-content label {
+            display: block;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .remarks-modal-content input,
+        .remarks-modal-content textarea {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 1rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            outline: none;
+            transition: all var(--transition-base);
+            font-family: inherit;
+        }
+
+        .remarks-modal-content input:focus,
+        .remarks-modal-content textarea:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(40, 116, 240, 0.1);
+        }
+
+        .remarks-modal-content textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .remarks-modal-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            padding: 20px 25px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .btn-cancel {
+            padding: 12px 24px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all var(--transition-base);
+        }
+
+        .btn-cancel:hover {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+        }
+
+        .btn-submit-remark {
+            padding: 12px 24px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            background: var(--gradient-primary);
+            border: none;
+            border-radius: var(--radius-md);
+            color: white;
+            cursor: pointer;
+            transition: all var(--transition-base);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-submit-remark:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .remarks-float-btn {
+                bottom: 15px;
+                right: 15px;
+                padding: 12px 18px;
+            }
+
+            .remarks-float-btn span {
+                display: none;
+            }
+
+            .remarks-modal-content {
+                width: 95%;
+                margin: 20px auto;
+            }
+        }
+    </style>
+
+    <script>
+        // Remarks Modal Functions
+        function openRemarksModal() {
+            document.getElementById('remarksModal').classList.add('active');
+        }
+
+        function closeRemarksModal() {
+            document.getElementById('remarksModal').classList.remove('active');
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('remarksModal')?.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeRemarksModal();
+            }
+        });
+    </script>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>
@@ -2647,7 +2929,7 @@ INDEX_TEMPLATE = '''
             </div>
             <div class="products-grid">
                 {% for website in websites %}
-                <a href="{{ website.link }}" target="_blank" class="product-card" data-name="{{ website.name|lower }}" data-category="{{ category }}">
+                <a href="/visit/{{ website.name | urlencode }}" target="_blank" class="product-card" data-name="{{ website.name|lower }}" data-category="{{ category }}">
                     {% if loop.index <= 3 %}
                     <span class="badge badge-popular">
                         <i class="fas fa-fire"></i> Popular
@@ -2924,6 +3206,7 @@ ADMIN_TEMPLATE = '''
             <select id="adminSectionSelect" class="category-filter" style="width: 100%; min-width: auto;" onchange="showAdminSection(this.value)">
                 <option value="users">👥 Users Management</option>
                 <option value="websites">🌐 Website Management</option>
+                <option value="remarks">💬 Reviews / Remarks</option>
             </select>
         </div>
     </div>
@@ -2957,6 +3240,9 @@ ADMIN_TEMPLATE = '''
                         {% endif %}
                     </td>
                     <td>
+                        <a href="{{ url_for('admin_user_history', username=user.username) }}" class="btn-add" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 0.85rem; margin-right: 8px; background: var(--info-color);">
+                            <i class="fas fa-history"></i> History
+                        </a>
                         <form method="POST" action="{{ url_for('delete_user', id=user.id) }}" style="display: inline;">
                             <button type="submit" class="btn-delete" onclick="return confirm('Are you sure you want to delete user {{ user.username }}?')">
                                 <i class="fas fa-trash"></i> Delete
@@ -3054,7 +3340,7 @@ ADMIN_TEMPLATE = '''
                         </span>
                     </td>
                     <td>
-                        <a href="{{ website.link }}" target="_blank" style="color: var(--primary-color);">
+                        <a href="/visit/{{ website.name | urlencode }}" target="_blank" style="color: var(--primary-color);">
                             <i class="fas fa-external-link-alt"></i> {{ website.link }}
                         </a>
                     </td>
@@ -3070,19 +3356,74 @@ ADMIN_TEMPLATE = '''
             </tbody>
         </table>
     </div>
+
+    <!-- Remarks Management Section -->
+    <div class="admin-panel" id="remarksSection" style="display: none;">
+        <h2 class="admin-title"><i class="fas fa-comments"></i> User Reviews / Remarks</h2>
+        
+        <div class="stats-bar" style="margin-bottom: 30px;">
+            <div class="stat-card">
+                <span class="stat-icon">💬</span>
+                <div class="stat-number">{{ total_remarks }}</div>
+                <div class="stat-label">Total Remarks</div>
+            </div>
+        </div>
+
+        <table class="websites-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Message</th>
+                    <th>Timestamp</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for remark in remarks %}
+                <tr>
+                    <td>{{ remark.id }}</td>
+                    <td>{{ remark.name if remark.name else 'Anonymous' }}</td>
+                    <td style="max-width: 400px; word-wrap: break-word;">{{ remark.message }}</td>
+                    <td>{{ remark.timestamp }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('delete_remark', id=remark.id) }}" style="display: inline;">
+                            <button type="submit" class="btn-delete" onclick="return confirm('Are you sure you want to delete this remark?')">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if not remarks %}
+        <p style="color: var(--text-secondary); text-align: center; padding: 30px;">
+            <i class="fas fa-comment-slash" style="font-size: 2rem; display: block; margin-bottom: 10px;"></i>
+            No remarks submitted yet.
+        </p>
+        {% endif %}
+    </div>
 </div>
 
 <script>
 function showAdminSection(section) {
     const usersSection = document.getElementById('usersSection');
     const websitesSection = document.getElementById('websitesSection');
+    const remarksSection = document.getElementById('remarksSection');
 
     if (section === 'users') {
         usersSection.style.display = 'block';
         websitesSection.style.display = 'none';
+        remarksSection.style.display = 'none';
     } else if (section === 'websites') {
         usersSection.style.display = 'none';
         websitesSection.style.display = 'block';
+        remarksSection.style.display = 'none';
+    } else if (section === 'remarks') {
+        usersSection.style.display = 'none';
+        websitesSection.style.display = 'none';
+        remarksSection.style.display = 'block';
     }
 }
 
@@ -3106,6 +3447,132 @@ function resetWebsiteSearch() {
     });
 }
 </script>
+{% endblock %}
+'''
+
+# ============================================================================
+# USER HISTORY TEMPLATE
+# ============================================================================
+USER_HISTORY_TEMPLATE = '''
+{% extends "base" %}
+{% block content %}
+<div class="container">
+    <div class="admin-panel">
+        <h2 class="admin-title"><i class="fas fa-history"></i> My Browsing History</h2>
+        
+        <div class="stats-bar" style="margin-bottom: 30px;">
+            <div class="stat-card">
+                <span class="stat-icon">👁️</span>
+                <div class="stat-number">{{ total_visits }}</div>
+                <div class="stat-label">Total Visits</div>
+            </div>
+        </div>
+
+        <table class="websites-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Website Name</th>
+                    <th>URL</th>
+                    <th>Visit Time</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in history %}
+                <tr>
+                    <td>{{ record.id }}</td>
+                    <td>{{ record.website_name }}</td>
+                    <td>
+                        <a href="{{ record.website_url }}" target="_blank" style="color: var(--primary-color); max-width: 400px; display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <i class="fas fa-external-link-alt"></i> {{ record.website_url }}
+                        </a>
+                    </td>
+                    <td>{{ record.visit_time }}</td>
+                    <td>
+                        <a href="{{ record.website_url }}" target="_blank" class="btn-add" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 0.85rem;">
+                            <i class="fas fa-external-link-alt"></i> Visit
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if not history %}
+        <p style="color: var(--text-secondary); text-align: center; padding: 30px;">
+            <i class="fas fa-history" style="font-size: 2rem; display: block; margin-bottom: 10px;"></i>
+            No browsing history yet. Start visiting websites to see your history here!
+        </p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+'''
+
+# ============================================================================
+# ADMIN USER HISTORY TEMPLATE
+# ============================================================================
+ADMIN_USER_HISTORY_TEMPLATE = '''
+{% extends "base" %}
+{% block content %}
+<div class="container">
+    <div class="admin-panel">
+        <h2 class="admin-title">
+            <i class="fas fa-user-clock"></i> User History: {{ viewed_username }}
+        </h2>
+        
+        <div style="margin-bottom: 20px;">
+            <a href="{{ url_for('admin') }}" class="btn-secondary" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-md); text-decoration: none;">
+                <i class="fas fa-arrow-left"></i> Back to Admin Panel
+            </a>
+        </div>
+
+        <div class="stats-bar" style="margin-bottom: 30px;">
+            <div class="stat-card">
+                <span class="stat-icon">👁️</span>
+                <div class="stat-number">{{ total_visits }}</div>
+                <div class="stat-label">Total Visits</div>
+            </div>
+        </div>
+
+        <table class="websites-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Website Name</th>
+                    <th>URL</th>
+                    <th>Visit Time</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in history %}
+                <tr>
+                    <td>{{ record.id }}</td>
+                    <td>{{ record.website_name }}</td>
+                    <td>
+                        <a href="{{ record.website_url }}" target="_blank" style="color: var(--primary-color); max-width: 400px; display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <i class="fas fa-external-link-alt"></i> {{ record.website_url }}
+                        </a>
+                    </td>
+                    <td>{{ record.visit_time }}</td>
+                    <td>
+                        <a href="{{ record.website_url }}" target="_blank" class="btn-add" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 0.85rem;">
+                            <i class="fas fa-external-link-alt"></i> Visit
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if not history %}
+        <p style="color: var(--text-secondary); text-align: center; padding: 30px;">
+            <i class="fas fa-user-slash" style="font-size: 2rem; display: block; margin-bottom: 10px;"></i>
+            No browsing history found for this user.
+        </p>
+        {% endif %}
+    </div>
+</div>
 {% endblock %}
 '''
 
@@ -3267,6 +3734,12 @@ def admin():
     cursor.execute('SELECT DISTINCT category FROM websites ORDER BY category')
     categories = [row[0] for row in cursor.fetchall()]
 
+    cursor.execute('SELECT * FROM remarks ORDER BY timestamp DESC')
+    remarks = cursor.fetchall()
+
+    cursor.execute('SELECT COUNT(*) FROM remarks')
+    total_remarks = cursor.fetchone()[0]
+
     conn.close()
 
     return render_template_string(
@@ -3277,7 +3750,9 @@ def admin():
         total_categories=total_categories,
         total_users=total_users,
         users=users,
-        categories=categories
+        categories=categories,
+        remarks=remarks,
+        total_remarks=total_remarks
     )
 
 
@@ -3337,6 +3812,141 @@ def delete_user(id):
 
     conn.close()
     return redirect(url_for('admin'))
+
+
+# ============================================================================
+# REMARKS/FEEDBACK ROUTES
+# ============================================================================
+
+@app.route('/submit_remark', methods=['POST'])
+def submit_remark():
+    name = request.form.get('name', '').strip()
+    message = request.form.get('message', '').strip()
+
+    if message:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('INSERT INTO remarks (name, message) VALUES (?, ?)', (name, message))
+        conn.commit()
+        conn.close()
+        flash('Thank you for your feedback!', 'success')
+    else:
+        flash('Message is required.', 'error')
+
+    # Redirect back to the referring page or home
+    return redirect(request.referrer or url_for('index'))
+
+
+@app.route('/admin/delete_remark/<int:id>', methods=['POST'])
+@admin_required
+def delete_remark(id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT name, message FROM remarks WHERE id = ?', (id,))
+    remark = cursor.fetchone()
+
+    if remark:
+        cursor.execute('DELETE FROM remarks WHERE id = ?', (id,))
+        conn.commit()
+        remark_name = remark['name'] if remark['name'] else 'Anonymous'
+        flash(f'Remark from "{remark_name}" deleted successfully!', 'success')
+    else:
+        flash('Remark not found.', 'error')
+
+    conn.close()
+    return redirect(url_for('admin'))
+
+
+# ============================================================================
+# USER HISTORY TRACKING ROUTES
+# ============================================================================
+
+@app.route('/visit/<path:site_name>')
+def visit_website(site_name):
+    """Track user visits to websites and redirect to actual URL"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Get the website from database by name
+    cursor.execute('SELECT name, link FROM websites WHERE name = ?', (site_name,))
+    website = cursor.fetchone()
+    
+    if website:
+        # Track the visit if user is logged in
+        if session.get('user_id'):
+            username = session.get('username', 'Anonymous')
+            cursor.execute(
+                'INSERT INTO user_history (username, website_name, website_url) VALUES (?, ?, ?)',
+                (username, website['name'], website['link'])
+            )
+            conn.commit()
+        
+        conn.close()
+        
+        # Redirect to the actual website
+        if website['link'].startswith('http'):
+            return redirect(website['link'])
+        else:
+            return redirect('https://' + website['link'])
+    else:
+        conn.close()
+        flash('Website not found.', 'error')
+        return redirect(url_for('index'))
+
+
+@app.route('/user/history')
+@login_required
+def user_history():
+    """Show logged-in user's own history"""
+    username = session.get('username')
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        'SELECT * FROM user_history WHERE username = ? ORDER BY visit_time DESC',
+        (username,)
+    )
+    history = cursor.fetchall()
+    
+    cursor.execute('SELECT COUNT(*) FROM user_history WHERE username = ?', (username,))
+    total_visits = cursor.fetchone()[0]
+    
+    conn.close()
+    
+    return render_template_string(
+        BASE_TEMPLATE.replace('{% block content %}{% endblock %}', USER_HISTORY_TEMPLATE.replace('{% extends "base" %}', '').replace('{% block content %}', '').replace('{% endblock %}', '')),
+        title='My History',
+        history=history,
+        total_visits=total_visits
+    )
+
+
+@app.route('/admin/user_history/<username>')
+@admin_required
+def admin_user_history(username):
+    """Admin view: Show specific user's history"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        'SELECT * FROM user_history WHERE username = ? ORDER BY visit_time DESC',
+        (username,)
+    )
+    history = cursor.fetchall()
+    
+    cursor.execute('SELECT COUNT(*) FROM user_history WHERE username = ?', (username,))
+    total_visits = cursor.fetchone()[0]
+    
+    conn.close()
+    
+    return render_template_string(
+        BASE_TEMPLATE.replace('{% block content %}{% endblock %}', ADMIN_USER_HISTORY_TEMPLATE.replace('{% extends "base" %}', '').replace('{% block content %}', '').replace('{% endblock %}', '')),
+        title=f'History - {username}',
+        history=history,
+        total_visits=total_visits,
+        viewed_username=username
+    )
 
 
 if __name__ == '__main__':
